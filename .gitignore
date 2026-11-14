@@ -9,3 +9,20 @@ __pycache__/
 venv/
 .venv/
 env/
+
+# secrets
+.env
+.env.*
+
+# python
+__pycache__/
+*.py[oc]
+.venv/
+build/
+dist/
+*.egg-info/
+
+# editors / OS
+.vscode/
+.idea/
+.DS_Store

@@ -1,0 +1,26 @@
+[project]
+name = "projects"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "polisdi", email = "di@ithelp.com.ua" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.162.7",
+    "langgraph>=1.2.22",
+    "openai>=3.51.0",
+    "pydantic>=2.14.3",
+    "pymongo>=4.20.0",
+    "python-dotenv>=1.2.4",
+    "rich>=15.0.0",
+    "uvicorn>=0.54.0",
+]
+
+[project.scripts]
+projects = "projects:main"
+
+[build-system]
+requires = ["uv_build>=0.13.8,<0.14.0"]
+build-backend = "uv_build"
