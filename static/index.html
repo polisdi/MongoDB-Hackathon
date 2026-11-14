@@ -29,7 +29,7 @@
 <body>
 <header>
   <h1>Scoped Memory Agent</h1>
-  <p>Invoice agent whose memory is scoped per client, expires, can be corrected or forgotten, and is proven to change decisions.</p>
+  <p>Memory You Can Govern · invoice agent whose memory is scoped per client, expires, can be corrected or forgotten, and is proven to change decisions · MongoDB Atlas + Vector Search</p>
 </header>
 <main>
   <section>
@@ -76,14 +76,22 @@ function ablCard(r) {
 }
 
 const CAPTIONS = {
-  '/run': 'The agent escalates a $7,200 invoice because of a client memory.',
-  '/ablation/latest': 'Proof: hide that memory and escalation drops from 100% to 0%. An irrelevant memory has no effect.',
-  '/ablate': 'Proof: hide that memory and escalation drops from 100% to 0%. An irrelevant memory has no effect.',
-  '/isolation': 'Client B cannot see client A\'s memories. Atlas rejects a memory with no client.',
-  '/correct': 'The owner corrects the rule: old version kept as history, new decision follows it.',
-  '/clock': 'Time passes: the rule expires and stops affecting decisions.',
-  '/forget': 'Forgotten: the content is gone, only an audit stub remains, and the decision changes.',
+  '/run': ['The agent escalates a $7,200 invoice because of a client memory.',
+           'Atlas Vector Search with pre-filters on client, status and expiry'],
+  '/ablation/latest': ['Proof: hide that memory and escalation drops from 100% to 0%. An irrelevant memory has no effect.',
+           'Same invoice replayed 5 times per arm; results stored in Atlas'],
+  '/ablate': ['Proof: hide that memory and escalation drops from 100% to 0%. An irrelevant memory has no effect.',
+           'Same invoice replayed per arm; results stored in Atlas'],
+  '/isolation': ['Client B cannot see client A\'s memories. Atlas rejects a memory with no client.',
+           'Filter applied inside $vectorSearch + $jsonSchema validation on the collection'],
+  '/clock': ['Time passes: the rule expires and stops affecting decisions.',
+           'Every read filters on expires_at; a TTL index purges later'],
+  '/correct': ['The owner corrects the rule: old version kept as history, new decision follows it.',
+           'New version and supersede written in one multi-document transaction'],
+  '/forget': ['Forgotten: the content is gone, only an audit stub remains, and the decision changes.',
+           'Text and embedding removed; event logged in memory_events'],
 };
+
 
 
 function render(path, j) {
@@ -113,7 +121,8 @@ async function call(path, method = 'POST') {
     const j = await r.json();
     const cap = Object.entries(CAPTIONS).find(([k]) => path.startsWith(k));
     out.innerHTML = r.ok
-      ? (cap ? `<p style="font-size:18px;font-weight:600;margin:0 0 12px">${esc(cap[1])}</p>` : '') + render(path, j)
+      ? (cap ? `<p style="font-size:18px;font-weight:600;margin:0">${esc(cap[1][0])}</p>
+                <p style="font-size:13px;color:var(--muted);margin:2px 0 12px">Under the hood: ${esc(cap[1][1])}</p>` : '') + render(path, j)
       : `<pre class="bad">${esc(JSON.stringify(j, null, 2))}</pre>`;
   } catch (e) { out.innerHTML = `<p class="bad">${esc(e)}</p>`; }
   document.querySelectorAll('button').forEach(b => b.disabled = false);
