@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Scoped Memory Agent</title>
+<style>
+  :root { --ink:#1b1f24; --muted:#5b6470; --line:#d8dde3; --accent:#00684a; --bg:#f7f8fa; --bad:#b42318; }
+  * { box-sizing:border-box; }
+  body { margin:0; font:15px/1.5 system-ui,sans-serif; color:var(--ink); background:var(--bg); }
+  header { padding:20px 24px; border-bottom:1px solid var(--line); background:#fff; }
+  header h1 { margin:0; font-size:20px; } header p { margin:4px 0 0; color:var(--muted); }
+  main { display:grid; grid-template-columns:340px 1fr; gap:20px; padding:20px 24px; }
+  .beat { background:#fff; border:1px solid var(--line); border-radius:10px; padding:14px; margin-bottom:12px; }
+  .beat h2 { margin:0 0 4px; font-size:15px; } .beat p { margin:0 0 10px; color:var(--muted); font-size:13px; }
+  button { font:inherit; padding:7px 12px; border-radius:8px; border:1px solid var(--accent);
+           background:var(--accent); color:#fff; cursor:pointer; margin:0 6px 6px 0; }
+  button.ghost { background:#fff; color:var(--accent); }
+  button:disabled { opacity:.5; cursor:wait; }
+  #out { background:#fff; border:1px solid var(--line); border-radius:10px; padding:16px; min-height:400px; }
+  .card { border-bottom:1px solid var(--line); padding:10px 0; }
+  .action { display:inline-block; padding:2px 10px; border-radius:99px; font-weight:600; color:#fff; }
+  .approve { background:#2f7d32; } .escalate { background:#b26a00; } .hold { background:#6b4fbb; }
+  .mem { font-size:13px; color:var(--muted); margin:2px 0; } code { font-size:12px; }
+  .big { font-size:22px; font-weight:600; } .bad { color:var(--bad); }
+  pre { background:var(--bg); padding:10px; border-radius:8px; overflow:auto; font-size:12px; }
+  @media (max-width:800px){ main { grid-template-columns:1fr; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>Scoped Memory Agent</h1>
+  <p>Invoice agent whose memory is scoped per client, expires, can be corrected or forgotten, and is proven to change decisions.</p>
+</header>
+<main>
+  <section>
+    <div class="beat"><h2>0 · Reset</h2><p>Fresh seed data, clock at Nov 14.</p>
+      <button class="ghost" onclick="call('/reset')">Reset demo</button></div>
+    <div class="beat"><h2>1 · The agent works</h2><p>Client A, Bright Smile Supplies, $7,200.</p>
+      <button onclick="call('/run')">Run hero invoice</button></div>
+    <div class="beat"><h2>2 · Prove memory changed behaviour</h2><p>Same invoice, memory hidden vs present, plus a control.</p>
+      <button onclick="call('/ablation/latest','GET')">Show stored (n=5)</button>
+      <button class="ghost" onclick="call('/ablate?n=3')">Run live (n=3)</button></div>
+    <div class="beat"><h2>3 · Isolation</h2><p>Client B asks about client A's rules; unscoped write attempt.</p>
+      <button onclick="call('/isolation')">Try to leak</button></div>
+    <div class="beat"><h2>4 · Correct and expire</h2><p>Owner raises the limit; then time passes.</p>
+      <button onclick="call('/correct?limit=10000')">Raise limit to $10K</button>
+      <button class="ghost" onclick="call('/clock?days=200')">Jump +200 days</button></div>
+    <div class="beat"><h2>5 · Forget</h2><p>Remove the vendor dispute note, keep the audit stub.</p>
+      <button onclick="call('/forget')">Forget memory</button></div>
+  </section>
+  <section id="out"><p style="color:var(--muted)">Pick a step on the left.</p></section>
+</main>
+<script>
+const out = document.getElementById('out');
+const esc = s => String(s ?? '').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+
+function runCard(r, title) {
+  const d = r.decision;
+  return `<div class="card"><div>${esc(title || 'Agent decision')} · <code>${esc(r.invoice.id)}</code>
+    ${esc(r.invoice.vendor)} $${r.invoice.amount.toLocaleString()} · sim date ${esc(r.now.slice(0,10))}</div>
+    <p><span class="action ${d.action}">${d.action}</span>
+    ${d.target_person ? ' → ' + esc(d.target_name || d.target_person) : ''} — ${esc(d.reason)}</p>
+    <div class="mem"><b>Memories retrieved (this client only, active, unexpired):</b></div>
+    ${r.retrieved.length ? r.retrieved.map(m => `<div class="mem"><code>${esc(m.id)}</code> ${esc(m.text)} (${m.score})</div>`).join('')
+      : '<div class="mem">none</div>'}
+    <div class="mem">Model says it used: ${d.memory_ids_used.map(esc).join(', ') || 'none'}</div></div>`;
+}
+
+function ablCard(r) {
+  if (!r) return '<p>No stored result yet — run it once after reset.</p>';
+  return `<div class="card"><div>${esc(r.label)}</div>
+    <p class="big">'${esc(r.target_action)}' ${Math.round(r.rate_with*100)}% with memory → ${Math.round(r.rate_without*100)}% without
+    &nbsp;(effect ${r.effect >= 0 ? '+' : ''}${Math.round(r.effect*100)}%)</p>
+    <div class="mem">with: <code>${esc(JSON.stringify(r.actions_with))}</code> · without: <code>${esc(JSON.stringify(r.actions_without))}</code> · n=${r.n}</div></div>`;
+}
+
+function render(path, j) {
+  if (path.startsWith('/run')) return runCard(j);
+  if (path.includes('ablat')) return ablCard(j.experiment) + ablCard(j.control);
+  if (path.startsWith('/isolation')) return `<div class="card"><div>Query as <b>client B</b>: “${esc(j.query_as_client_b)}”</div>
+      ${j.results.map(m => `<div class="mem"><code>${esc(m.client_id)}</code> ${esc(m.text)}</div>`).join('')}
+      <p><b>Client A memories returned: ${j.results.filter(m => m.client_id !== 'client_b').length}</b></p></div>
+      <div class="card"><b>Write without client_id:</b> <span class="bad">${esc(j.schema_check)}</span></div>`;
+  if (path.startsWith('/correct')) return `<div class="card"><b>Versions:</b>${j.versions.map(v =>
+      `<div class="mem"><code>${esc(v._id)}</code> v${v.version} · ${esc(v.status)} — ${esc(v.text)}</div>`).join('')}</div>`
+      + runCard(j.rerun, 'Rerun after correction');
+  if (path.startsWith('/clock')) return runCard(j.rerun, 'Rerun at ' + j.now.slice(0,10));
+
+  if (path.startsWith('/forget')) return runCard(j.before, 'Pearl Dental Lab invoice BEFORE forgetting')
+      + `<div class="card"><b>Tombstone (no text, no embedding):</b><pre>${esc(JSON.stringify(j.tombstone, null, 2))}</pre>
+      <b>History:</b>${j.history.map(e => `<div class="mem">${esc(e.at.slice(0,10))} · ${esc(e.event)} by ${esc(e.actor)}</div>`).join('')}</div>`
+      + runCard(j.rerun, 'Pearl Dental Lab invoice after forgetting');
+  return `<pre>${esc(JSON.stringify(j, null, 2))}</pre>`;
+}
+
+async function call(path, method = 'POST') {
+  document.querySelectorAll('button').forEach(b => b.disabled = true);
+  out.innerHTML = '<p>Working…</p>';
+  try {
+    const r = await fetch(path, { method });
+    const j = await r.json();
+    out.innerHTML = r.ok ? render(path, j) : `<pre class="bad">${esc(JSON.stringify(j, null, 2))}</pre>`;
+  } catch (e) { out.innerHTML = `<p class="bad">${esc(e)}</p>`; }
+  document.querySelectorAll('button').forEach(b => b.disabled = false);
+}
+</script>
+</body>
+</html>
+
