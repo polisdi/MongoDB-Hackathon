@@ -5,7 +5,8 @@ from openai import OpenAI
 
 load_dotenv()
 db = MongoClient(os.environ["MONGODB_URI"])[os.environ["DB_NAME"]]
-llm = OpenAI(base_url=os.environ["LLM_BASE_URL"], api_key="lm-studio")
+llm = OpenAI(base_url=os.environ["LLM_BASE_URL"], api_key=os.environ.get("LLM_API_KEY", "lm-studio"))
+embedder = OpenAI(base_url=os.environ["EMBED_BASE_URL"], api_key="lm-studio")
 UTC = dt.timezone.utc
 DEFAULT_NOW = dt.datetime(2026, 11, 14, 12, 0, tzinfo=UTC)
 
@@ -21,7 +22,7 @@ def set_now(t: dt.datetime):
 def embed(text: str, kind: str = "document") -> list[float]:
     # nomic-embed expects these prefixes; harmless for most other models
     prefix = "search_document: " if kind == "document" else "search_query: "
-    r = llm.embeddings.create(model=os.environ["EMBED_MODEL"], input=[prefix + text])
+    r = embedder.embeddings.create(model=os.environ["EMBED_MODEL"], input=[prefix + text])
     return r.data[0].embedding
 
 def log_event(memory_id, client_id, event, actor, run_id=None):

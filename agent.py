@@ -5,10 +5,13 @@ from langgraph.graph import StateGraph, END
 from common import db, llm, now
 from governor import MemoryGovernor
 
+from pydantic import BaseModel, ConfigDict, ValidationError
+
 gov = MemoryGovernor()
 MODEL = os.environ["LLM_MODEL"]
 
 class Decision(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     action: Literal["approve", "escalate", "hold"]
     target_person: str          # role key like "office_manager", or "" if not escalating
     reason: str
@@ -25,8 +28,11 @@ Pick exactly one action:
 - approve: pay as normal
 - escalate: send to a named person for approval (set target_person to their role key)
 - hold: park it because something is wrong or a check is needed
-Default: approve, unless one of the client's memories says otherwise.
-Only cite memory ids that you actually relied on. Reply with JSON only."""
+Default: approve any invoice from any vendor, at any amount.
+Only escalate or hold when a client memory below explicitly requires it.
+Do not invent rules, thresholds or checks that are not in the memories.
+A memory applies only if this invoice matches its vendor and amount conditions exactly.
+Keep reason under 25 words."""
 
 def load_invoice(s: S) -> S:
     inv = db.invoices.find_one({"_id": s["invoice_id"], "client_id": s["client_id"]})
@@ -52,7 +58,7 @@ def decide(s: S) -> S:
         user += f"\n\nYour previous answer was invalid: {s['error']}. Fix it."
     messages = [{"role": "system", "content": SYSTEM}, {"role": "user", "content": user}]
     r = llm.chat.completions.create(
-        model=MODEL, messages=messages,
+        model=MODEL, messages=messages, max_tokens=200,
         temperature=s.get("temperature", 0), seed=s.get("seed", 7),
         response_format={"type": "json_schema", "json_schema": {
             "name": "decision", "strict": True, "schema": Decision.model_json_schema()}})

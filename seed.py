@@ -32,7 +32,7 @@ MEMS = [
      "Invoices from known suppliers Golden Mill Flour and Daily Dairy can be auto-approved.",
      "user_stated", D(2026, 9, 15)),
     ("mem_b_rule_flour", "client_b", "rule",
-     "Flour supplier invoices over $2,000 go to the owner for approval, not the manager.",
+     "Invoices from Golden Mill Flour over $2,000 go to the owner for approval, not the manager.",
      "user_stated", D(2026, 10, 10)),
     ("mem_b_rule_5k", "client_b", "rule",
      "Invoices over $5,000 need the owner's approval.",
