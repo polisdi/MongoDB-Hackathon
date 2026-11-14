@@ -28,7 +28,7 @@ def run(client_id, invoice_id):
     return {"run_id": out["run_id"],
             "invoice": {"id": inv["_id"], "client": out["client"]["name"],
                         "vendor": inv["vendor"], "amount": inv["amount"]},
-            "decision": out["decision"],
+            "decision":  d,
             "retrieved": [{"id": m["_id"], "text": m["text"], "score": round(m["score"], 3)}
                           for m in out["memories"]],
             "now": now()}
@@ -76,6 +76,7 @@ def isolation():
 
 @app.post("/correct")
 def correct(limit: int = 10000):
+    set_now(DEFAULT_NOW)
     cur = db.memories.find_one({"_id": {"$regex": "^mem_a_rule_5k"}, "status": "active"})
     new_id = gov.correct(cur["_id"], f"Never auto-approve invoices over ${limit:,}. "
                          "Escalate them to the office manager for approval.", by="owner")
@@ -85,8 +86,10 @@ def correct(limit: int = 10000):
 
 @app.post("/clock")
 def clock(days: int = 200):
+    set_now(DEFAULT_NOW)
+    before = run(*HERO)
     set_now(DEFAULT_NOW + dt.timedelta(days=days))
-    return clean({"now": now(), "rerun": run(*HERO)})
+    return clean({"now": now(), "before": before, "rerun": run(*HERO)})
 
 
 @app.post("/forget")

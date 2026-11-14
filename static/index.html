@@ -34,17 +34,18 @@
 <main>
   <section>
     <div class="beat"><h2>0 · Reset</h2><p>Fresh seed data, clock at Nov 14.</p>
-      <button class="ghost" onclick="call('/reset')">Reset demo</button></div>
+      <button class="ghost" onclick="call('/reset')">Reset demo</button>
+      <button class="ghost" onclick="call('/ablate?n=5')">Run live (n=5)</button></div>
     <div class="beat"><h2>1 · The agent works</h2><p>Client A, Bright Smile Supplies, $7,200.</p>
       <button onclick="call('/run')">Run hero invoice</button></div>
     <div class="beat"><h2>2 · Prove memory changed behaviour</h2><p>Same invoice, memory hidden vs present, plus a control.</p>
       <button onclick="call('/ablation/latest','GET')">Show stored (n=5)</button>
-      <button class="ghost" onclick="call('/ablate?n=3')">Run live (n=3)</button></div>
+      <button class="ghost" onclick="call('/ablate?n=3')">Precompute (n=3)</button>
     <div class="beat"><h2>3 · Isolation</h2><p>Client B asks about client A's rules; unscoped write attempt.</p>
       <button onclick="call('/isolation')">Try to leak</button></div>
-    <div class="beat"><h2>4 · Correct and expire</h2><p>Owner raises the limit; then time passes.</p>
-      <button onclick="call('/correct?limit=10000')">Raise limit to $10K</button>
-      <button class="ghost" onclick="call('/clock?days=200')">Jump +200 days</button></div>
+    <div class="beat"><h2>4 · Expire and correct</h2><p>Time passes and the rule expires; then the owner corrects it.</p>
+      <button class="ghost" onclick="call('/clock?days=200')">Jump +200 days</button>
+      <button onclick="call('/correct?limit=10000')">Raise limit to $10K</button></div>
     <div class="beat"><h2>5 · Forget</h2><p>Remove the vendor dispute note, keep the audit stub.</p>
       <button onclick="call('/forget')">Forget memory</button></div>
   </section>
@@ -74,6 +75,17 @@ function ablCard(r) {
     <div class="mem">with: <code>${esc(JSON.stringify(r.actions_with))}</code> · without: <code>${esc(JSON.stringify(r.actions_without))}</code> · n=${r.n}</div></div>`;
 }
 
+const CAPTIONS = {
+  '/run': 'The agent escalates a $7,200 invoice because of a client memory.',
+  '/ablation/latest': 'Proof: hide that memory and escalation drops from 100% to 0%. An irrelevant memory has no effect.',
+  '/ablate': 'Proof: hide that memory and escalation drops from 100% to 0%. An irrelevant memory has no effect.',
+  '/isolation': 'Client B cannot see client A\'s memories. Atlas rejects a memory with no client.',
+  '/correct': 'The owner corrects the rule: old version kept as history, new decision follows it.',
+  '/clock': 'Time passes: the rule expires and stops affecting decisions.',
+  '/forget': 'Forgotten: the content is gone, only an audit stub remains, and the decision changes.',
+};
+
+
 function render(path, j) {
   if (path.startsWith('/run')) return runCard(j);
   if (path.includes('ablat')) return ablCard(j.experiment) + ablCard(j.control);
@@ -84,7 +96,7 @@ function render(path, j) {
   if (path.startsWith('/correct')) return `<div class="card"><b>Versions:</b>${j.versions.map(v =>
       `<div class="mem"><code>${esc(v._id)}</code> v${v.version} · ${esc(v.status)} — ${esc(v.text)}</div>`).join('')}</div>`
       + runCard(j.rerun, 'Rerun after correction');
-  if (path.startsWith('/clock')) return runCard(j.rerun, 'Rerun at ' + j.now.slice(0,10));
+  if (path.startsWith('/clock')) return runCard(j.before, 'Today (Nov 14)') + runCard(j.rerun, 'After 200 days (' + j.now.slice(0,10) + ')');
 
   if (path.startsWith('/forget')) return runCard(j.before, 'Pearl Dental Lab invoice BEFORE forgetting')
       + `<div class="card"><b>Tombstone (no text, no embedding):</b><pre>${esc(JSON.stringify(j.tombstone, null, 2))}</pre>
@@ -99,7 +111,10 @@ async function call(path, method = 'POST') {
   try {
     const r = await fetch(path, { method });
     const j = await r.json();
-    out.innerHTML = r.ok ? render(path, j) : `<pre class="bad">${esc(JSON.stringify(j, null, 2))}</pre>`;
+    const cap = Object.entries(CAPTIONS).find(([k]) => path.startsWith(k));
+    out.innerHTML = r.ok
+      ? (cap ? `<p style="font-size:18px;font-weight:600;margin:0 0 12px">${esc(cap[1])}</p>` : '') + render(path, j)
+      : `<pre class="bad">${esc(JSON.stringify(j, null, 2))}</pre>`;
   } catch (e) { out.innerHTML = `<p class="bad">${esc(e)}</p>`; }
   document.querySelectorAll('button').forEach(b => b.disabled = false);
 }
